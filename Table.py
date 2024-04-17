@@ -133,6 +133,15 @@ def exchange_cards(nation: Nation, target_nation: Nation) -> None:
     get_card_from_target(nation=nation, target_nation=target_nation)
 
 
+def diplomacy_conflict(nation: Nation, player: Player,
+                       target_nation: Nation, target_player: Player) -> bool:
+    _diplomacy_specialists_letters = [ZOKER, ACE, TEN]
+    return True if activate_specialists(special_letters=_diplomacy_specialists_letters,
+                                        nation=nation, player=player) or \
+                   activate_specialists(special_letters=_diplomacy_specialists_letters,
+                                        nation=target_nation, player=target_player) else False
+
+
 def cold_war(nation: Nation, target_nation: Nation) -> bool or None:
     _specialist_letter = nation.opened_cabinet[0].letter
     _target_specialist_letter = target_nation.opened_cabinet[0].letter
@@ -154,10 +163,9 @@ def fall() -> None:
             suggest_a_card(nation=_target_nation, player=_target_player)
 
             if _player.make_a_decision() & _target_player.make_a_decision():
-                if activate_specialists(special_letters=[ZOKER, ACE, TEN],
-                                        nation=_nation, player=_player) or \
-                        activate_specialists(special_letters=[ZOKER, ACE, TEN],
-                                             nation=_target_nation, player=_target_player):
+                if diplomacy_conflict(nation=_nation, player=_player,
+                                      target_nation=_target_nation, target_player=_target_player):
+
                     pass  # todo
                 else:
                     exchange_cards(nation=_nation, target_nation=_target_nation)
