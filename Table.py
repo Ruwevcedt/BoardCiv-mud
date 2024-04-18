@@ -46,7 +46,7 @@ def draw_until_five_people(nation: Nation) -> None:
     draw(nation=nation, quantity=5 - len(nation.people))
 
 
-def mulligan() -> None:
+def mulligan_for_each_nation() -> None:
     """
     for _nation in ALL_NATIONS:
         if not _nation.check_is_playable():
@@ -63,7 +63,7 @@ def genesis() -> None:
     shuffle_deck()
     [draw(nation=_nation, quantity=5) for _nation in ALL_NATIONS]
     while not check_can_start_game():
-        mulligan()
+        mulligan_for_each_nation()
 
 
 def activate_specialists(special_letters: list[Letter], nation: Nation, player: Player) -> bool:
@@ -75,9 +75,8 @@ def activate_specialists(special_letters: list[Letter], nation: Nation, player: 
     return False
 
 
-def activate_queen_of_spring(nation: Nation, player: Player) -> None:
-    if activate_specialists(special_letters=[QUEEN], nation=nation, player=player):
-        draw(nation=nation, quantity=1)
+def queen_activated(nation: Nation, player: Player) -> bool:
+    return activate_specialists(special_letters=[QUEEN], nation=nation, player=player)
 
 
 def spring() -> None:
@@ -85,7 +84,8 @@ def spring() -> None:
         draw(nation=_nation, quantity=1)
 
         # _player = search_player_by_nation(nation=_nation)
-        activate_queen_of_spring(nation=_nation, player=search_player_by_nation(nation=_nation))
+        if queen_activated(nation=_nation, player=search_player_by_nation(nation=_nation)):
+            draw(nation=_nation, quantity=1)
 
 
 def clear_cabinet(nation: Nation) -> None:
@@ -116,8 +116,19 @@ def suggest_a_card(nation: Nation, player: Player) -> None:
     show_cards(nation=nation, cards=player.select_cards(cards=nation.people, quantity=1))
 
 
+def suggest_and_response(nation: Nation, player: Player,
+                         target_nation: Nation, target_player: Player) -> None:
+    suggest_a_card(nation=nation, player=player)
+    suggest_a_card(nation=target_nation, player=target_player)
+
+
 def clear_suggested_cards(nation: Nation) -> None:
     move_cards(from_field=nation.drafted_people, cards=nation.drafted_people, to_field=nation.people)
+
+
+def clear_suggestion_and_response(nation: Nation, target_nation: Nation) -> None:
+    clear_suggested_cards(nation=nation)
+    clear_suggested_cards(nation=target_nation)
 
 
 def give_card_to_target(nation: Nation, target_nation: Nation) -> None:
@@ -133,8 +144,8 @@ def exchange_cards(nation: Nation, target_nation: Nation) -> None:
     get_card_from_target(nation=nation, target_nation=target_nation)
 
 
-def diplomacy_conflict(nation: Nation, player: Player,
-                       target_nation: Nation, target_player: Player) -> bool:
+def specialists_activated_during_diplomacy(nation: Nation, player: Player,
+                                           target_nation: Nation, target_player: Player) -> bool:
     _diplomacy_specialists_letters = [ZOKER, ACE, TEN]
     return True if activate_specialists(special_letters=_diplomacy_specialists_letters,
                                         nation=nation, player=player) or \
@@ -142,38 +153,57 @@ def diplomacy_conflict(nation: Nation, player: Player,
                                         nation=target_nation, player=target_player) else False
 
 
-def cold_war(nation: Nation, target_nation: Nation) -> bool or None:
-    _specialist_letter = nation.opened_cabinet[0].letter
-    _target_specialist_letter = target_nation.opened_cabinet[0].letter
+def check_win_diplomatic_war(nation: Nation, target_nation: Nation) -> bool or None:
+    try:
+        _specialist_letter = nation.opened_cabinet[0].letter
+    except IndexError:
+        return False
+    try:
+        _target_specialist_letter = target_nation.opened_cabinet[0].letter
+    except IndexError:
+        return True
 
     if _specialist_letter == _target_specialist_letter:
         return None
+    elif _specialist_letter == ZOKER:
+        return True if _target_specialist_letter == ACE else False
+    elif _specialist_letter == ACE:
+        return True if _target_specialist_letter == TEN else False
+    elif _specialist_letter == TEN:
+        return True if _target_specialist_letter == ZOKER else False
 
 
 def fall() -> None:
     for _nation in ALL_NATIONS:
         _player = search_player_by_nation(nation=_nation)
 
-        _target_nation = _player.aim_a_nation_for_a_diplomacy()
+        _target_nation = _player.aim_a_nation_for_a_diplomacy() # 손패 없는 상대는 제외됨
         _target_player = search_player_by_nation(nation=_target_nation)
 
         _trial = 3
         while _trial > 0:
-            suggest_a_card(nation=_nation, player=_player)
-            suggest_a_card(nation=_target_nation, player=_target_player)
+            suggest_and_response(nation=_nation, player=_player,
+                                 target_nation=_target_nation, target_player=_target_player)
 
             if _player.make_a_decision() & _target_player.make_a_decision():
-                if diplomacy_conflict(nation=_nation, player=_player,
-                                      target_nation=_target_nation, target_player=_target_player):
-
-                    pass  # todo
+                if specialists_activated_during_diplomacy(nation=_nation, player=_player,
+                                                          target_nation=_target_nation, target_player=_target_player):
+                    _result_of_diplomatic_war = check_win_diplomatic_war(nation=_nation, target_nation=_target_nation)
+                    if _result_of_diplomatic_war:
+                        get_card_from_target(nation=_nation, target_nation=_target_nation)
+                    elif _result_of_diplomatic_war is not None:
+                        give_card_to_target(nation=_nation, target_nation=_target_nation)
+                    clear_suggestion_and_response(nation=_nation, target_nation=_target_nation)
                 else:
                     exchange_cards(nation=_nation, target_nation=_target_nation)
                 break
             else:
-                clear_suggested_cards(nation=_nation)
-                clear_suggested_cards(nation=_target_nation)
+                clear_suggestion_and_response(nation=_nation, target_nation=_target_nation)
                 _trial -= 1
+
+
+def winter() -> None:
+    for _nation in ALL_NATIONS:
 
 
 genesis()
