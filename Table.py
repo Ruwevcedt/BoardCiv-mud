@@ -122,6 +122,10 @@ def suggest_and_response(nation: Nation, player: Player,
     suggest_a_card(nation=target_nation, player=target_player)
 
 
+def negotiation_agreed(player: Player, target_player: Player) -> bool:
+    return player.make_a_decision() & target_player.make_a_decision()
+
+
 def clear_suggested_cards(nation: Nation) -> None:
     move_cards(from_field=nation.drafted_people, cards=nation.drafted_people, to_field=nation.people)
 
@@ -153,7 +157,7 @@ def specialists_activated_during_diplomacy(nation: Nation, player: Player,
                                         nation=target_nation, player=target_player) else False
 
 
-def check_win_diplomatic_war(nation: Nation, target_nation: Nation) -> bool or None:
+def check_specialists_compatibility(nation: Nation, target_nation: Nation) -> bool or None:
     try:
         _specialist_letter = nation.opened_cabinet[0].letter
     except IndexError:
@@ -173,40 +177,61 @@ def check_win_diplomatic_war(nation: Nation, target_nation: Nation) -> bool or N
         return True if _target_specialist_letter == ZOKER else False
 
 
+def diplomatic_war(nation: Nation, target_nation: Nation, result: bool or None) -> None:
+    if result:
+        get_card_from_target(nation=nation, target_nation=target_nation)
+    elif result is not None:
+        give_card_to_target(nation=nation, target_nation=target_nation)
+    clear_suggestion_and_response(nation=nation, target_nation=target_nation)
+
+
 def fall() -> None:
     for _nation in ALL_NATIONS:
         _player = search_player_by_nation(nation=_nation)
 
-        _target_nation = _player.aim_a_nation_for_a_diplomacy() # 손패 없는 상대는 제외됨
+        _target_nation = _player.aim_a_nation_for_a_diplomacy()  # 손패 없는 상대는 제외됨
         _target_player = search_player_by_nation(nation=_target_nation)
 
-        _trial = 3
-        while _trial > 0:
+        _negotiation_token = 3
+        while _negotiation_token > 0:
             suggest_and_response(nation=_nation, player=_player,
                                  target_nation=_target_nation, target_player=_target_player)
 
-            if _player.make_a_decision() & _target_player.make_a_decision():
+            if negotiation_agreed(player=_player, target_player=_target_player):
                 if specialists_activated_during_diplomacy(nation=_nation, player=_player,
                                                           target_nation=_target_nation, target_player=_target_player):
-                    _result_of_diplomatic_war = check_win_diplomatic_war(nation=_nation, target_nation=_target_nation)
-                    if _result_of_diplomatic_war:
-                        get_card_from_target(nation=_nation, target_nation=_target_nation)
-                    elif _result_of_diplomatic_war is not None:
-                        give_card_to_target(nation=_nation, target_nation=_target_nation)
-                    clear_suggestion_and_response(nation=_nation, target_nation=_target_nation)
+                    # _result_of_diplomatic_war = check_specialists_compatibility(nation=_nation, target_nation=_target_nation)
+                    diplomatic_war(nation=_nation, target_nation=_target_nation,
+                                   result=check_specialists_compatibility(nation=_nation, target_nation=_target_nation))
                 else:
                     exchange_cards(nation=_nation, target_nation=_target_nation)
                 break
             else:
                 clear_suggestion_and_response(nation=_nation, target_nation=_target_nation)
-                _trial -= 1
+                _negotiation_token -= 1
 
 
 def winter() -> None:
     for _nation in ALL_NATIONS:
+        _player = search_player_by_nation(nation=_nation)
 
+        _target_nation = _player.aim_a_nation()
+        _target_player = search_player_by_nation(nation=_target_nation)
+
+        # 한장씩 보여주며 총 3장 draft
+        # move cards(from nation.people to nation.drafted people) for each nation
+
+        # shadow cabinet의 letter in number_letters 인 카드를 activate해 1장까지 추가로 draft 가능
+        # if activate specialist(special letters=num_letters): draft spsecialist
+
+        # battlefield의 camp로 drafted people을 이동해 감춤
+        # move cards(from nation.drafted people to battlefield.camp) for each nation
+
+        # offensive nation부터 stragety 설정
+        # move
 
 genesis()
 spring()
 summer()
 fall()
+winter()
