@@ -12,6 +12,8 @@ class Nation:
     people: Field
     drafted_people: Field
 
+    hired_mercenary_token: int
+
     def __init__(self, suit: Suit):
         self.suit = suit
 
@@ -21,6 +23,8 @@ class Nation:
 
         self.people = Field(suit=self.suit, cards=[], is_visible=False)
         self.drafted_people = Field(suit=self.suit, cards=[], is_visible=True)
+
+        self.hired_mercenary_token = 0
 
     def check_is_playable(self) -> bool:
         return True if len(self.people.search_cards(suits=[NONE_SUIT, self.suit])) > 1 else False

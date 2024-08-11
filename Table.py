@@ -1,6 +1,6 @@
 from random import shuffle
 
-from Attributes import Letter, KING, ALL_SUITS, NONE_SUIT, QUEEN, ZOKER, ACE, TEN
+from Attributes import Letter, KING, ALL_SUITS, NONE_SUIT, QUEEN, ZOKER, ACE, TEN, NUMBER_LETTERS
 from Cards import Card
 from Field import move_cards
 from Nations import ALL_NATIONS, Nation
@@ -15,10 +15,6 @@ def search_player_by_nation(nation: Nation) -> Player:
 def distribute_king() -> None:
     [move_cards(from_field=NATURE.deck, cards=NATURE.deck.search_cards(suits=[_nation.suit], letters=[KING]),
                 to_field=_nation.throne) for _nation in ALL_NATIONS]
-
-
-def shuffle_deck() -> None:
-    shuffle(NATURE.deck)
 
 
 def draw(nation: Nation, quantity: int) -> None:
@@ -60,7 +56,7 @@ def mulligan_for_each_nation() -> None:
 
 def genesis() -> None:
     distribute_king()
-    shuffle_deck()
+    shuffle(NATURE.deck)
     [draw(nation=_nation, quantity=5) for _nation in ALL_NATIONS]
     while not check_can_start_game():
         mulligan_for_each_nation()
@@ -79,6 +75,10 @@ def queen_activated(nation: Nation, player: Player) -> bool:
     return activate_specialists(special_letters=[QUEEN], nation=nation, player=player)
 
 
+def clear_opened_cabinet(nation: Nation) -> None:
+    move_cards(from_field=nation.opened_cabinet, cards=nation.opened_cabinet, to_field=NATURE.deck)
+
+
 def spring() -> None:
     for _nation in ALL_NATIONS:
         draw(nation=_nation, quantity=1)
@@ -86,11 +86,12 @@ def spring() -> None:
         # _player = search_player_by_nation(nation=_nation)
         if queen_activated(nation=_nation, player=search_player_by_nation(nation=_nation)):
             draw(nation=_nation, quantity=1)
+            clear_opened_cabinet(nation=_nation)
 
 
 def clear_cabinet(nation: Nation) -> None:
     move_cards(from_field=nation.shadow_cabinet, cards=nation.shadow_cabinet, to_field=nation.people)
-    move_cards(from_field=nation.opened_cabinet, cards=nation.opened_cabinet, to_field=NATURE.deck)
+    clear_opened_cabinet(nation=nation)
 
 
 def assign_cabinet(nation: Nation, cards: list[Card]) -> None:
@@ -108,12 +109,12 @@ def summer() -> None:
         assign_cabinet(nation=_nation, cards=_player.select_cards(cards=_candidates, quantity=_quantity))
 
 
-def show_cards(nation: Nation, cards: list[Card]) -> None:
-    move_cards(from_field=nation.people, cards=cards, to_field=nation.drafted_people)
+def show_people(nation: Nation, people: list[Card]) -> None:
+    move_cards(from_field=nation.people, cards=people, to_field=nation.drafted_people)
 
 
 def suggest_a_card(nation: Nation, player: Player) -> None:
-    show_cards(nation=nation, cards=player.select_cards(cards=nation.people, quantity=1))
+    show_people(nation=nation, people=player.select_cards(cards=nation.people, quantity=1))
 
 
 def suggest_and_response(nation: Nation, player: Player,
@@ -185,6 +186,10 @@ def diplomatic_war(nation: Nation, target_nation: Nation, result: bool or None) 
     clear_suggestion_and_response(nation=nation, target_nation=target_nation)
 
 
+def clear_both_specialists(nation: Nation, target_nation: Nation) -> None:
+    [clear_opened_cabinet(nation=_nation) for _nation in [nation, target_nation]]
+
+
 def fall() -> None:
     for _nation in ALL_NATIONS:
         _player = search_player_by_nation(nation=_nation)
@@ -200,15 +205,43 @@ def fall() -> None:
             if negotiation_agreed(player=_player, target_player=_target_player):
                 if specialists_activated_during_diplomacy(nation=_nation, player=_player,
                                                           target_nation=_target_nation, target_player=_target_player):
-                    # _result_of_diplomatic_war = check_specialists_compatibility(nation=_nation, target_nation=_target_nation)
+                    # _result_of_diplomatic_war =
+                    #   check_specialists_compatibility(nation=_nation, target_nation=_target_nation)
                     diplomatic_war(nation=_nation, target_nation=_target_nation,
                                    result=check_specialists_compatibility(nation=_nation, target_nation=_target_nation))
+                    clear_both_specialists(nation=_nation, target_nation=_target_nation)
                 else:
                     exchange_cards(nation=_nation, target_nation=_target_nation)
                 break
             else:
                 clear_suggestion_and_response(nation=_nation, target_nation=_target_nation)
                 _negotiation_token -= 1
+
+
+def hire_mercenary(nation: Nation):
+    move_cards(from_field=NATURE.deck, cards=[NATURE.deck[0]], to_field=nation.drafted_people)
+    nation.hired_mercenary_token += 1
+
+
+def draft_card(nation: Nation, player: Player) -> None:
+    move_cards(from_field=nation.people,
+               cards=player.select_cards(cards=nation.people, quantity=1), to_field=nation.drafted_people) \
+        if nation.people else hire_mercenary(nation=nation)
+
+
+def draft_cards(nation: Nation, player: Player,
+                target_nation: Nation, target_player: Player) -> None:
+    [draft_card(nation=_nation, player=_player) for _nation, _player
+     in zip([nation, target_nation] * 3, [player, target_player] * 3)]
+
+
+def call_guard(nation: Nation, guards: list[Card]) -> None:
+    move_cards(from_field=nation.opened_cabinet, cards=guards, to_field=nation.drafted_people)
+
+
+def guard_activated(nation: Nation, player: Player) -> None:
+    activate_specialists(special_letters=NUMBER_LETTERS, nation=nation, player=player)
+    call_guard(nation=nation, guards=nation.opened_cabinet)
 
 
 def winter() -> None:
@@ -218,8 +251,11 @@ def winter() -> None:
         _target_nation = _player.aim_a_nation()
         _target_player = search_player_by_nation(nation=_target_nation)
 
-        # 한장씩 보여주며 총 3장 draft
-        # move cards(from nation.people to nation.drafted people) for each nation
+        # _engaged_nations: list[Nation] = [_nation, _target_nation]
+        # _engaged_players: list[Player] = [_player, _target_player]
+
+        draft_cards(nation=_nation, player=_player,
+                    target_nation=_target_nation, target_player=_target_player)
 
         # shadow cabinet의 letter in number_letters 인 카드를 activate해 1장까지 추가로 draft 가능
         # if activate specialist(special letters=num_letters): draft spsecialist
@@ -229,6 +265,7 @@ def winter() -> None:
 
         # offensive nation부터 stragety 설정
         # move
+
 
 genesis()
 spring()
